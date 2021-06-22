@@ -1,0 +1,20 @@
+.header{
+    max-width: 880px;
+    margin: 45px auto 40px;
+    border-bottom: 1px solid rgb(84, 84, 84, .7);
+}
+
+@media all and (max-width: 880px){
+    .header{
+        max-width: 826px;
+        padding-left: 27px;
+        padding-right: 27px;
+    }
+}
+
+@media all and (max-width: 550px){
+    .header{
+        margin-top: 28px;
+        margin-bottom: 38.25px;
+    }
+}
