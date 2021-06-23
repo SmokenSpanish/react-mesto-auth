@@ -1,5 +1,8 @@
 import React from 'react';
+import { Route, Switch, useHistory } from 'react-router-dom';
 import Header from './Header';
+import Login from "./Login";
+import Register from "./Register";
 import Main from './Main';
 import Footer from './Footer';
 import ImagePopup from './ImagePopup';
@@ -9,6 +12,11 @@ import EditProfilePopup from './EditProfilePopup';
 import EditAvatarPopup from './EditAvatarPopup';
 import AddPlacePopup from './AddPlacePopup';
 import ConfirmPopup from './ConfirmPopup';
+import InfoTooltip from "./InfoTooltip";
+import successImage from "../images/Success.png";
+import errorImage from "../images/Error.png";
+import ProtectedRoute from "./ProtectedRoute";
+import * as auth from "../utils/auth.js";
 
 function App() {
 
@@ -20,6 +28,8 @@ function App() {
 
   const [isConfirmPopupOpen, setIsConfirmPopupOpen] = React.useState(false);
 
+  const [isInfoTooltipOpen, setInfoTooltipOpen] = React.useState(false);
+
   const [selectedCard, setSelectedCard] = React.useState(null);
 
   const [currentUser, setCurrentUser] = React.useState({});
@@ -29,6 +39,42 @@ function App() {
   const [isLoading, setIsLoading] = React.useState(false);
 
   const [idCardForDelete, setIdCardForDelete] = React.useState(null);
+
+  const [ loggedIn, setLoggedIn ] = React.useState(false);
+
+  const [ status, setStatus ] = React.useState('');
+
+  const [ infoTooltipImage, setInfoTooltipImage ] = React.useState('');
+
+  const [ email, setEmail ] = React.useState('');
+
+  const history = useHistory();
+
+  const handleTokenCheck = React.useCallback(() => {
+    const jwt = localStorage.getItem('token');
+    if (jwt) {
+        auth.checkToken(jwt)
+            .then((res) => {
+                if (res.data) {
+                    setLoggedIn(true);
+                    setEmail(res.data.email);
+                    history.push('/');
+                }
+            })
+            .catch((err) => {
+                history.push('sign-in');
+                if (err === 400) {
+                    console.log(`Ошибка: ${err} - Не передано одно из полей`)
+                } else if (err === 401) {
+                    console.log(`Ошибка: ${err} - Пользователь с email не найден`)
+                }
+            })
+    }
+  }, [history]);
+
+React.useEffect(() => {
+  handleTokenCheck()
+}, [handleTokenCheck]);
 
   React.useEffect(() => {
     Promise.all([api.getUserInfo(), api.getCards()])
@@ -40,6 +86,55 @@ function App() {
         console.log('Promise.all', err);
       });
   }, []);
+
+  function handleRegister(data) {
+    auth.register(data)
+        .then((res) => {
+            if (res.data.email) {
+                history.push('/sign-in');
+                setStatus('Вы успешно зарегистрировались!');
+                setInfoTooltipImage(successImage);
+                setInfoTooltipOpen(true);
+            }
+        })
+        .catch((err) => {
+            setStatus('Что-то пошло не так!\n' +
+                'Попробуйте ещё раз.');
+            setInfoTooltipImage(errorImage);
+            setInfoTooltipOpen(true);
+            if (err === 400) {
+                console.log(`Ошибка: ${err} - Некорректно заполнено одно из полей`)
+            }
+        })
+}
+
+function handleLogin(data) {
+    auth.login(data)
+        .then((res) => {
+            if (res.token) {
+                localStorage.setItem('token', res.token);
+                setLoggedIn(true);
+                setEmail(data.email);
+                history.push('/');
+            }
+        })
+        .catch((err) => {
+            setStatus('Что-то пошло не так!');
+            setInfoTooltipImage(errorImage);
+            setInfoTooltipOpen(true);
+            if (err === 400) {
+                console.log(`Ошибка: ${err} - Не передано одно из полей`)
+            } else if (err === 401) {
+                console.log(`Ошибка: ${err} - Пользователь с email не найден`)
+            }
+        })
+}
+
+function handleLogout() {
+  localStorage.removeItem('token');
+  setLoggedIn(false);
+  setEmail('');
+}
 
   function handleCardDeleteConfirm() {
     setIsLoading(true);
@@ -98,9 +193,12 @@ function App() {
     setIsEditProfilePopupOpen(false);
     setIsAddPlacePopupOpen(false);
     setIsConfirmPopupOpen(false);
+    setInfoTooltipOpen(false);
     setSelectedCard(null);
     // setIsLoading(false);
     setIdCardForDelete(null);
+    setInfoTooltipImage('');
+    setStatus('');
   }
 
   const handleUpdateUser = (user) => {
@@ -151,18 +249,32 @@ function App() {
   return (
     <div className="page">
       <CurrentUserContext.Provider value={currentUser}>
-        <Header />
-        <Main
-          onEditProfile={handleEditProfileClick}
-          onAddPlace={handleAddPlaceClick}
-          onEditAvatar={handleEditAvatarClick}
-          onCardClick={handleCardClick} 
-          cards={cards}
-          onCardLike={handleCardLike}
-          onCardDelete={handleCardDelete}
-          />
+        <Header loggedIn={loggedIn} email={email} onLogout={handleLogout}/>
+        <Switch>
+          <Route path="/sign-in">
+            <Login onLogin={handleLogin}/>
+          </Route>
+
+          <Route path="/sign-up">
+            <Register onRegister={handleRegister}/>
+          </Route>
+
+          <ProtectedRoute
+              exact path="/"
+              component={Main}
+              loggedIn={loggedIn}
+              onEditProfile={handleEditProfileClick}
+              onAddPlace={handleAddPlaceClick}
+              onEditAvatar={handleEditAvatarClick}
+              onCardClick={handleCardClick}
+              cards={cards}
+              onCardLike={handleCardLike}
+              onCardDelete={handleCardDelete}
+            />
+            </Switch>
+            <Footer loggedIn={loggedIn}/>
           
-        <Footer />
+        
         <ImagePopup card={selectedCard} onClose={closeAllPopups} />
         <EditProfilePopup
           isOpen={isEditProfilePopupOpen}
@@ -191,6 +303,14 @@ function App() {
           onConfirmDeleteCard={handleCardDeleteConfirm}
           isLoading={isLoading}
         />
+
+        <InfoTooltip
+          isOpen={isInfoTooltipOpen}
+          onClose={closeAllPopups}
+          image={infoTooltipImage}
+          title={status}
+        />
+
       </CurrentUserContext.Provider>
     </div>
   );

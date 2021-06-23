@@ -7,4 +7,4 @@
 БЭМ 
 React (cra)
 
-[Посмотреть работу](https://SmokenSpanish.github.io/mesto-react/index.html)
+[Посмотреть работу](https://SmokenSpanish.github.io/react-mesto-auth)
